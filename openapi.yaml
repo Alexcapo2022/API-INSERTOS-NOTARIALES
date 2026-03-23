@@ -1,0 +1,107 @@
+openapi: 3.0.3
+info:
+  title: API-INSEROS
+  description: Servicio backend para manipular y componer documentos DOCX directamente en memoria.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3018
+    description: Servidor Local
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+  /api/insertos:
+    get:
+      summary: Listar insertos disponibles
+      description: Retorna la lista de insertos DOCX disponibles en la carpeta assets/insertos.
+      responses:
+        '200':
+          description: Lista de insertos
+  /api/compose:
+    post:
+      summary: Componer documento con insertos
+      description: Toma un documento DOCX base via multipart y lo combina con los insertos especificados reemplazando el marcador '[INSERTOS]'.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Documento DOCX base
+                insertIds:
+                  type: string
+                  description: Array JSON en string con los IDs de los insertos. Ej. "[1,2]"
+                pageBreakBetween:
+                  type: string
+                  description: "'true' o 'false'."
+      responses:
+        '200':
+          description: Archivo DOCX compuesto
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+  /api/inspect:
+    post:
+      summary: Inspeccionar documento DOCX
+      description: Revisa si el documento DOCX contiene los marcadores exactos de inserción.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Resultados de inspección
+  /api/minuta:
+    post:
+      summary: Insertar minuta en documento
+      description: Inserta de forma binaria en memoria un documento DOCX (minuta) dentro de otro (destino) en la ubicación del marcador configurado.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                minuta:
+                  type: string
+                  format: binary
+                destino:
+                  type: string
+                  format: binary
+                placeholder:
+                  type: string
+                  default: '[MINUTA]'
+                pageBreakBefore:
+                  type: string
+                pageBreakAfter:
+                  type: string
+      responses:
+        '200':
+          description: Archivo DOCX modificado
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary

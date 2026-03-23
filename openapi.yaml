@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: API-INSEROS
+  title: API-INSERTOS-NOTARIALES
   description: Servicio backend para manipular y componer documentos DOCX directamente en memoria.
   version: 1.0.0
 servers:

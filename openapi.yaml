@@ -20,14 +20,14 @@ paths:
                 properties:
                   ok:
                     type: boolean
-  /api/insertos:
+  /api/v1/insertos:
     get:
       summary: Listar insertos disponibles
       description: Retorna la lista de insertos DOCX disponibles en la carpeta assets/insertos.
       responses:
         '200':
           description: Lista de insertos
-  /api/compose:
+  /api/v1/compose:
     post:
       summary: Componer documento con insertos
       description: Toma un documento DOCX base via multipart y lo combina con los insertos especificados reemplazando el marcador '[INSERTOS]'.
@@ -56,7 +56,7 @@ paths:
               schema:
                 type: string
                 format: binary
-  /api/inspect:
+  /api/v1/inspect:
     post:
       summary: Inspeccionar documento DOCX
       description: Revisa si el documento DOCX contiene los marcadores exactos de inserción.
@@ -73,7 +73,7 @@ paths:
       responses:
         '200':
           description: Resultados de inspección
-  /api/minuta:
+  /api/v1/minuta:
     post:
       summary: Insertar minuta en documento
       description: Inserta de forma binaria en memoria un documento DOCX (minuta) dentro de otro (destino) en la ubicación del marcador configurado.
@@ -124,9 +124,9 @@ paths:
                   type: string
                   format: binary
                   description: Documento DOCX adjunto a insertar como minuta
-                insertIds:
+                inserto_id:
                   type: string
-                  description: Array JSON en string con los IDs de los insertos. Ej. "[1,2]"
+                  description: (Opcional) Array JSON en string con los IDs de los insertos. Ej. "[1,2]"
                 placeholder:
                   type: string
                   default: '[MINUTA]'

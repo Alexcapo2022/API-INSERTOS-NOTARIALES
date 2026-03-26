@@ -54,10 +54,10 @@ app.get('/', (_req, res) =>
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // ⬇️ API
-app.use('/api/insertos', insertosRoutes);
-app.use('/api/compose', composeRoutes);
-app.use('/api/inspect', inspectRoutes);
-app.use('/api/minuta', minutaRoutes);
+app.use('/api/v1/insertos', insertosRoutes);
+app.use('/api/v1/compose', composeRoutes);
+app.use('/api/v1/inspect', inspectRoutes);
+app.use('/api/v1/minuta', minutaRoutes);
 app.use('/api/v1/consolidar', consolidarRoutes);
 
 module.exports = app;

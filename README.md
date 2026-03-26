@@ -18,12 +18,34 @@ El proyecto ha sido rediseñado para cumplir un estándar sólido de **API-First
 
 Todo el detalle canónico de parámetros, esquemas formales y códigos de respuesta se encuentra documentado en el archivo formal adjunto al repositorio: [openapi.yaml](./openapi.yaml). 
 
-Puedes usar Swagger Editor, Postman o ReDoc importando el archivo `openapi.yaml` para obtener la interfaz gráfica colaborativa de la API y compartirlo con tu equipo front. Las rutas principales son:
-1. **`GET /api/insertos`**: Lista la información de los adjuntos/insertos disponibles desde la carpeta originaria.
-2. **`POST /api/compose`**: Lógica transaccional transitoria (en memoria) que mezcla el documento base y sus múltiples insertos por lotes y descargas.
-3. **`POST /api/minuta`**: Interconecta ágilmente dos documentos DOCX anexando la minuta de origen donde marque la aguja localizadora del destino.
-4. **`POST /api/inspect`**: Revisa analíticamente y valida el recuento de los marcadores internos disponibles en el XML enlazado.
-5. **`POST /api/v1/consolidar`**: Ensambla y consolida la lógica unificada combinando `compose` y `minuta`. Requiere `file` (documento base), `minuta` (documento adjunto) y `insertIds`. Reemplaza el marcador `[INSERTOS]` con los fragmentos, e integra el adjunto en `[MINUTA]`.
+Las rutas principales ahora utilizan el prefijo `/api/v1/` para producción:
+
+1. **`GET /api/v1/insertos`**: Lista los insertos disponibles.
+   - *Respuesta*: JSON con el listado de IDs y nombres de archivos.
+
+2. **`POST /api/v1/compose`**: Mezcla el documento base con múltiples insertos.
+   - *Parámetros (Multipart)*:
+     - `file`: Documento DOCX base.
+     - `insertIds`: String o Array JSON con IDs (ej. `"1,2"` o `"[1,2]"`).
+     - `pageBreakBetween` (opcional): `"true"` para insertar saltos de página entre cada inserto.
+
+3. **`POST /api/v1/minuta`**: Inserta un documento (minuta) en un marcador específico.
+   - *Parámetros (Multipart)*:
+     - `minuta`: Documento DOCX a inyectar.
+     - `destino`: Documento DOCX donde se inyectará.
+     - `placeholder` (opcional): Marcador de búsqueda (default `[MINUTA]`).
+     - `pageBreakBefore` / `pageBreakAfter` (opcionales): `"true"` para saltos de página.
+
+4. **`POST /api/v1/inspect`**: Valida marcadores en un documento.
+   - *Parámetros (Multipart)*: `file` (DOCX).
+
+5. **`POST /api/v1/consolidar`**: **(Nuevo)** Lógica unificada de `compose` + `minuta`.
+   - *Parámetros (Multipart)*:
+     - `file`: Documento base (debe tener `[INSERTOS]` y `[MINUTA]`).
+     - `minuta`: Documento a inyectar en el marcador de minuta.
+     - `inserto_id` (opcional): IDs de los fragmentos para el marcador de insertos. Si no se envía, se ignora el paso de insertos pero se procesa la minuta.
+     - `pageBreakBetween`, `pageBreakBefore`, `pageBreakAfter`: Control de saltos de página.
+
 
 ## Despliegue en Servidor Linux (Criterios y Recomendaciones)
 Considera puntalmente los siguientes requisitos para un entorno de Producción en el servidor Linux usando Systemd/PM2:

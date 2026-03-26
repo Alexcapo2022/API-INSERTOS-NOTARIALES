@@ -268,7 +268,7 @@
     // =========================
     async function loadInsertos(){
       try{
-        const res = await fetch(`/api/insertos`);
+        const res = await fetch(`/api/v1/insertos`);
         const json = await res.json();
         state.insertos = (json.items || []).map(it=>{
           let title = it.title || null;
@@ -318,7 +318,7 @@
 
       setBusy(true);
       try{
-        const res = await fetch(`/api/compose`, { method:'POST', body: fd });
+        const res = await fetch(`/api/v1/compose`, { method:'POST', body: fd });
         if(!res.ok){
           const msg = await safeText(res);
           throw new Error(msg || 'Error de composición');
@@ -403,7 +403,7 @@
 
       setBusyMin(true);
       try{
-        const res = await fetch('/api/minuta', { method:'POST', body: fd });
+        const res = await fetch('/api/v1/minuta', { method:'POST', body: fd });
         if(!res.ok){
           const msg = await safeText(res);
           throw new Error(msg || 'Error al insertar minuta');

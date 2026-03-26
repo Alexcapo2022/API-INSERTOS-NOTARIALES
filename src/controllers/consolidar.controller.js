@@ -18,7 +18,7 @@ function parseIds(raw) {
  * form-data:
  *  - file: DOCX base (File)
  *  - minuta: DOCX adjunto (File)
- *  - insertIds: String de ids ("1,2" o "[1,2]")
+ *  - inserto_id: (Opcional) String de ids ("1,2" o "[1,2]")
  *  - placeholder: (Opcional) String default "[MINUTA]"
  *  - pageBreakBefore: (Opcional) "true"
  *  - pageBreakAfter: (Opcional) "true"
@@ -30,21 +30,18 @@ async function consolidar(req, res) {
     const file = files.file?.[0];
     const minuta = files.minuta?.[0];
     const body = req.body || {};
-    const ids = parseIds(body.insertIds ?? body.ids ?? body.insertosIds);
+    // Prioridad a 'inserto_id' como pidió el usuario
+    const ids = parseIds(body.inserto_id ?? body.insertIds ?? body.ids ?? body.insertosIds);
 
     console.log('[consolidar] → entrada', {
       file: file ? { name: file.originalname, size: file.size } : null,
       minuta: minuta ? { name: minuta.originalname, size: minuta.size } : null,
-      ids
+      inserto_id: ids
     });
 
     if (!file || !minuta) {
       console.warn('[consolidar] faltan archivos file o minuta');
       return res.status(400).json({ error: 'Envía ambos archivos en form-data: "file" (base) y "minuta" (.docx).' });
-    }
-    if (!ids.length) {
-      console.warn('[consolidar] faltan insertIds');
-      return res.status(400).json({ error: 'Envía al menos un ID en insertIds (ej. 1,3,5 o [1,3,5]).' });
     }
 
     const placeholder = (body.placeholder || '[MINUTA]').trim();
@@ -52,25 +49,40 @@ async function consolidar(req, res) {
     const after  = ['1','true','on','yes'].includes(String(body.pageBreakAfter  || '').toLowerCase());
     const between = ['1','true','on','yes'].includes(String(body.pageBreakBetween  || '').toLowerCase());
 
-    // 1. Validar [INSERTOS]
-    const { exact: exactI, mixed: mixedI } = await countInsertosPlaceholders(file.buffer);
-    if (exactI === 0 && mixedI === 0) {
-      return res.status(400).json({
-        error: 'El documento base no contiene el marcador requerido para insertos.',
-        marker: '[INSERTOS]',
-        found: false
-      });
-    }
-    if (mixedI > 0) {
-      return res.status(400).json({
-        error: 'El marcador [INSERTOS] debe estar solo en su propio párrafo (sin texto antes/después).',
-        marker: '[INSERTOS]',
-        mixed: mixedI
-      });
+    let currentBuffer = file.buffer;
+
+    // 1. Validar e inyectar [INSERTOS] (Si hay IDs)
+    if (ids.length > 0) {
+      const { exact: exactI, mixed: mixedI } = await countInsertosPlaceholders(currentBuffer);
+      if (exactI === 0 && mixedI === 0) {
+        return res.status(400).json({
+          error: 'El documento base no contiene el marcador requerido para insertos.',
+          marker: '[INSERTOS]',
+          found: false
+        });
+      }
+      if (mixedI > 0) {
+        return res.status(400).json({
+          error: 'El marcador [INSERTOS] debe estar solo en su propio párrafo (sin texto antes/después).',
+          marker: '[INSERTOS]',
+          mixed: mixedI
+        });
+      }
+
+      currentBuffer = await composeInMemory(currentBuffer, ids, { pageBreakBetween: between });
+
+      // Post-check insertos
+      const postIns = await countInsertosPlaceholders(currentBuffer);
+      if (postIns.exact > 0) {
+        console.error('[consolidar] aún hay placeholders [INSERTOS] tras componer');
+        return res.status(500).json({ error: 'No se pudo insertar en los marcadores [INSERTOS].' });
+      }
+    } else {
+      console.log('[consolidar] No se enviaron inserto_id; se omite paso de composición de insertos.');
     }
 
-    // 2. Validar [MINUTA]
-    const { exact: exactM, mixed: mixedM } = countPlaceholder(file.buffer, placeholder);
+    // 2. Validar e inyectar [MINUTA]
+    const { exact: exactM, mixed: mixedM } = countPlaceholder(currentBuffer, placeholder);
     if (exactM === 0 && mixedM === 0) {
       return res.status(400).json({
         error: `El documento base no contiene el marcador requerido para la minuta.`,
@@ -86,25 +98,15 @@ async function consolidar(req, res) {
       });
     }
 
-    // 3. Componer Insertos
-    const step1Buffer = await composeInMemory(file.buffer, ids, { pageBreakBetween: between });
-
-    // Post-check insertos
-    const postIns = await countInsertosPlaceholders(step1Buffer);
-    if (postIns.exact > 0) {
-      console.error('[consolidar] aún hay placeholders [INSERTOS] tras componer');
-      return res.status(500).json({ error: 'No se pudo insertar en los marcadores [INSERTOS].' });
-    }
-
-    // 4. Fusionar Minuta
-    const finalBuffer = mergeMinutaInMemory(step1Buffer, minuta.buffer, {
+    // Fusionar Minuta
+    currentBuffer = mergeMinutaInMemory(currentBuffer, minuta.buffer, {
       placeholder,
       pageBreakBefore: before,
       pageBreakAfter: after
     });
 
     // Post-check minuta
-    const postMin = countPlaceholder(finalBuffer, placeholder);
+    const postMin = countPlaceholder(currentBuffer, placeholder);
     if (postMin.exact > 0) {
       console.error('[consolidar] aún hay placeholders [MINUTA] tras componer');
       return res.status(500).json({ error: `No se pudo insertar en el marcador ${placeholder}.` });
@@ -113,7 +115,7 @@ async function consolidar(req, res) {
     res.setHeader('X-Consolidar-Processed-Ids', ids.length.toString());
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="consolidado_${Date.now()}.docx"`);
-    return res.send(finalBuffer);
+    return res.send(currentBuffer);
 
   } catch (err) {
     console.error('[consolidar] ERROR ', err);

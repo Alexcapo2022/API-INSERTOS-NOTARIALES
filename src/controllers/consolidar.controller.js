@@ -2,15 +2,41 @@ const { composeInMemory, countInsertosPlaceholders } = require('../services/comp
 const { mergeMinutaInMemory, countPlaceholder } = require('../services/minuta.service');
 
 function parseIds(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw.flatMap(parseIds);
+  if (!raw) return { ids: [], error: null };
+  if (Array.isArray(raw)) {
+    const results = raw.map(parseIds);
+    const err = results.find(r => r.error);
+    if (err) return err;
+    return { ids: results.flatMap(r => r.ids), error: null };
+  }
   if (typeof raw === 'string') {
     const s = raw.trim();
-    if (!s) return [];
-    if (s.startsWith('[')) { try { return JSON.parse(s); } catch {} }
-    return s.split(/[,\s]+/).map(Number).filter(n => !Number.isNaN(n));
+    if (!s) return { ids: [], error: null };
+    let tokens = [];
+    if (s.startsWith('[')) { 
+      try { 
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed)) tokens = parsed;
+        else tokens = [parsed];
+      } catch {
+        return { ids: [], error: 'El formato JSON de inserto_id es inválido.' };
+      } 
+    } else {
+      tokens = s.split(/[,\s]+/);
+    }
+    
+    const ids = [];
+    for (const t of tokens) {
+      if (t === null || t === undefined || String(t).trim() === '') continue;
+      const n = Number(t);
+      if (Number.isNaN(n)) {
+        return { ids: [], error: `ID inválido detectado: "${t}". Solo se permiten números.` };
+      }
+      ids.push(n);
+    }
+    return { ids, error: null };
   }
-  return [];
+  return { ids: [], error: 'El tipo de dato de inserto_id no es soportado.' };
 }
 
 /**
@@ -26,12 +52,29 @@ function parseIds(raw) {
  */
 async function consolidar(req, res) {
   try {
+    const body = req.body || {};
+    
+    // 0. Validación de Seguridad: Solo parámetros permitidos
+    const allowedKeys = ['inserto_id', 'insertIds', 'ids', 'insertosIds', 'placeholder', 'pageBreakBefore', 'pageBreakAfter', 'pageBreakBetween'];
+    const extraKeys = Object.keys(body).filter(k => !allowedKeys.includes(k));
+    if (extraKeys.length > 0) {
+      console.warn('[consolidar] parámetros no permitidos:', extraKeys);
+      return res.status(400).json({ 
+        error: 'Petición rechazada por seguridad: parámetros no permitidos detectados.',
+        invalidFields: extraKeys 
+      });
+    }
+
     const files = req.files || {};
     const file = files.file?.[0];
     const minuta = files.minuta?.[0];
-    const body = req.body || {};
-    // Prioridad a 'inserto_id' como pidió el usuario
-    const ids = parseIds(body.inserto_id ?? body.insertIds ?? body.ids ?? body.insertosIds);
+    
+    // Validación de IDs estricta
+    const { ids, error: idError } = parseIds(body.inserto_id ?? body.insertIds ?? body.ids ?? body.insertosIds);
+    if (idError) {
+      console.warn('[consolidar] error en IDs:', idError);
+      return res.status(400).json({ error: idError });
+    }
 
     console.log('[consolidar] → entrada', {
       file: file ? { name: file.originalname, size: file.size } : null,

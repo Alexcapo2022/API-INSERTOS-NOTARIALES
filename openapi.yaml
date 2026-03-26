@@ -105,3 +105,45 @@ paths:
               schema:
                 type: string
                 format: binary
+  /api/v1/consolidar:
+    post:
+      summary: Ensamblar y consolidar base con insertos y minuta
+      description: Toma un documento DOCX base via multipart, reemplaza en memoria el marcador '[INSERTOS]' con los fragmentos indicados, e integra el documento minuta adjunto en el marcador '[MINUTA]'.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Documento DOCX base
+                minuta:
+                  type: string
+                  format: binary
+                  description: Documento DOCX adjunto a insertar como minuta
+                insertIds:
+                  type: string
+                  description: Array JSON en string con los IDs de los insertos. Ej. "[1,2]"
+                placeholder:
+                  type: string
+                  default: '[MINUTA]'
+                pageBreakBefore:
+                  type: string
+                  description: "'true' o 'false'."
+                pageBreakAfter:
+                  type: string
+                  description: "'true' o 'false'."
+                pageBreakBetween:
+                  type: string
+                  description: "'true' o 'false'."
+      responses:
+        '200':
+          description: Archivo DOCX consolidado
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary

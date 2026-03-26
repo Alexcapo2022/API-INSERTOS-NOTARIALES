@@ -23,6 +23,7 @@ Puedes usar Swagger Editor, Postman o ReDoc importando el archivo `openapi.yaml`
 2. **`POST /api/compose`**: Lógica transaccional transitoria (en memoria) que mezcla el documento base y sus múltiples insertos por lotes y descargas.
 3. **`POST /api/minuta`**: Interconecta ágilmente dos documentos DOCX anexando la minuta de origen donde marque la aguja localizadora del destino.
 4. **`POST /api/inspect`**: Revisa analíticamente y valida el recuento de los marcadores internos disponibles en el XML enlazado.
+5. **`POST /api/v1/consolidar`**: Ensambla y consolida la lógica unificada combinando `compose` y `minuta`. Requiere `file` (documento base), `minuta` (documento adjunto) y `insertIds`. Reemplaza el marcador `[INSERTOS]` con los fragmentos, e integra el adjunto en `[MINUTA]`.
 
 ## Despliegue en Servidor Linux (Criterios y Recomendaciones)
 Considera puntalmente los siguientes requisitos para un entorno de Producción en el servidor Linux usando Systemd/PM2:
@@ -34,5 +35,5 @@ Considera puntalmente los siguientes requisitos para un entorno de Producción e
    pm2 save
    pm2 startup
    ```
-4. **Proxy Reverso (NGINX)**: Necesario encadenarlo detrás un servidor proxy web local como *Nginx* en puertos estándar (80 HTTP y 443 HTTPS), el cual a su vez re-enruta el tráfico ocultamente al puerto del Node Process (Por ej. local `3018`).
+4. **Proxy Reverso (NGINX)**: Necesario encadenarlo detrás un servidor proxy web local como *Nginx* en puertos estándar. La API estará disponible en producción bajo la URL principal: `http://161.132.68.187:8011`.
 5. **Permisos de Archivos**: Valida repetidas veces que el usuario o daemon que arranca la App (p. Ej `www-data`) tenga derechos totales de lectura a la ruta de tus minutas/archivos o te marcará `Forbidden/ENOENT`.

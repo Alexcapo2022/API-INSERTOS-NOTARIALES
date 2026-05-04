@@ -10,7 +10,8 @@ async function procesarMinutaInteligente(req, res) {
     }
 
     const fileBuffer = req.file.buffer;
-    const { co_cnl, fuente, tamaño, interlineado, margenes } = req.body;
+    const { co_cnl, fuente, interlineado, margenes } = req.body;
+    const tamaño = req.body.tamaño || req.body.tamano; // Soportar ambo nombres
 
     if (!co_cnl) {
       return res.status(400).json({ ok: false, msg: 'Falta el parámetro co_cnl' });

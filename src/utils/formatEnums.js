@@ -17,8 +17,10 @@ const MAX_FONT_SIZE = 72;
 
 const ALLOWED_LINE_SPACING = [1, 1.15, 1.5, 2, 2.5, 3];
 
-function validateFormatOptions({ fuente, tamaño, interlineado, margenes }) {
+function validateFormatOptions(options) {
   const errors = [];
+  const { fuente, interlineado, margenes } = options;
+  const tamaño = options.tamaño || options.tamano; // Soportar ambos
 
   // Validar Fuente
   if (fuente) {

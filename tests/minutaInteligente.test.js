@@ -7,6 +7,9 @@ const REMOTE_URL = 'http://161.132.68.187:8011';
 const MINUTAS_DIR = path.join(__dirname, 'minutas');
 
 describe('Pruebas Unitarias: Minuta Inteligente (Producción)', () => {
+  // Configurar un timeout gigante a nivel de describe para todos los tests
+  jest.setTimeout(300000); // 5 minutos máximo
+
   it('Debería procesar correctamente todos los documentos en tests/minutas', async () => {
     // Si el directorio no existe, no hacemos nada
     if (!fs.existsSync(MINUTAS_DIR)) {
@@ -19,9 +22,6 @@ describe('Pruebas Unitarias: Minuta Inteligente (Producción)', () => {
       console.log(`[Tests] No hay archivos .docx en ${MINUTAS_DIR}. Saltando test.`);
       return;
     }
-
-    // Aumentamos timeout por si los documentos son grandes y la IA demora
-    jest.setTimeout(30000 * files.length);
 
     for (const file of files) {
       console.log(`\n========================================`);
@@ -50,7 +50,8 @@ describe('Pruebas Unitarias: Minuta Inteligente (Producción)', () => {
       
       expect(contentDisposition).toContain(expectedFileName);
 
-      console.log(`[Test] ✔️ Éxito con ${file}. Archivo devuelto: ${expectedFileName} (${response.body.length} bytes).`);
+      const bytes = response.headers['content-length'] || '?';
+      console.log(`[Test] ✔️ Éxito con ${file}. Archivo devuelto: ${expectedFileName} (${bytes} bytes).`);
     }
   });
 });

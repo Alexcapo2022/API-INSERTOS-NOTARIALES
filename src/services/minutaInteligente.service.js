@@ -140,22 +140,35 @@ function processMinutaInteligente(buffer, aiLimits, formatOptions) {
   const searchStart = normalizeText(aiLimits.texto_inicio);
   const searchEnd = normalizeText(aiLimits.texto_fin);
 
-  // Búsqueda del índice de inicio
-  for (let i = 0; i < children.length; i++) {
-    const text = normalizeText(getParagraphText(children[i]));
-    if (text && text.includes(searchStart)) {
-      startIdx = i;
-      break;
+  // Mapeamos cada caracter del texto normalizado a su nodo original
+  const charToNodeIdx = [];
+  let fullTextStr = '';
+
+  children.forEach((child, idx) => {
+    const pText = getParagraphText(child);
+    if (pText) {
+      const normalizedPText = normalizeText(pText);
+      if (normalizedPText) {
+        const textToAppend = normalizedPText + ' '; // 1 espacio entre párrafos
+        for (let i = 0; i < textToAppend.length; i++) {
+          charToNodeIdx.push(idx);
+        }
+        fullTextStr += textToAppend;
+      }
     }
+  });
+
+  // Búsqueda del índice de inicio
+  const startMatchPos = fullTextStr.indexOf(searchStart);
+  if (startMatchPos !== -1) {
+    startIdx = charToNodeIdx[startMatchPos];
   }
 
   // Búsqueda del índice de fin
-  for (let i = children.length - 1; i >= startIdx; i--) {
-    const text = normalizeText(getParagraphText(children[i]));
-    if (text && text.includes(searchEnd)) {
-      endIdx = i;
-      break;
-    }
+  const endMatchPos = fullTextStr.lastIndexOf(searchEnd); // lastIndexOf por si hay textos repetidos, buscar el último
+  if (endMatchPos !== -1) {
+    const matchEndChar = endMatchPos + searchEnd.length - 1;
+    endIdx = charToNodeIdx[matchEndChar];
   }
 
   // Slice de los hijos validos, excluyendo sectPr que siempre debe ir al final

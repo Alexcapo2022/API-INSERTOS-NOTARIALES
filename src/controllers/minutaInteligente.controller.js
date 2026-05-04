@@ -35,12 +35,15 @@ async function procesarMinutaInteligente(req, res) {
       ORDER BY p.fe_creacion DESC LIMIT 1
     `, [co_cnl]);
 
-    let reglasPrompt = "Detecta el inicio real y el fin real de la minuta."; // fallback por defecto
-    if (rows && rows.length > 0) {
-      reglasPrompt = rows[0].de_prompt;
-    } else {
-      console.warn(`[Controller] No se encontraron reglas para co_cnl=${co_cnl}, usando fallback.`);
+    if (!rows || rows.length === 0) {
+      console.error(`[Controller] No se encontraron reglas (prompt) para co_cnl=${co_cnl}`);
+      return res.status(404).json({ 
+        ok: false, 
+        msg: `El código de servicio co_cnl '${co_cnl}' no tiene un prompt configurado o activo en la base de datos.` 
+      });
     }
+    
+    const reglasPrompt = rows[0].de_prompt;
 
     // 2. Extraer texto para la IA
     const textoDoc = minutaService.extractTextForAI(fileBuffer);

@@ -60,8 +60,13 @@ async function procesarMinutaInteligente(req, res) {
     const nuevoDocxBuffer = minutaService.processMinutaInteligente(fileBuffer, aiLimits, formatOptions);
 
     // 5. Retornar archivo
+    const originalName = req.file.originalname || 'documento.docx';
+    const baseName = originalName.replace(/\.[^/.]+$/, "");
+    const dateStr = new Date().toISOString().split('T')[0];
+    const finalName = `${baseName}-${dateStr}.docx`;
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', 'attachment; filename="Minuta_Inteligente.docx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${finalName}"`);
     return res.status(200).send(nuevoDocxBuffer);
 
   } catch (error) {

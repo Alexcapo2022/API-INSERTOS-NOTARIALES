@@ -55,8 +55,8 @@ function applyCustomFormat(nodes, formatOptions) {
   function walk(n) {
     if (!n || typeof n !== 'object') return;
 
-    // Modificar interlineado en w:p
-    if ('w:p' in n && interlineado && Array.isArray(n['w:p'])) {
+    // Modificar interlineado y propiedades de texto en w:p
+    if ('w:p' in n && Array.isArray(n['w:p'])) {
       let pChildren = n['w:p'];
       let pPrNode = pChildren.find(child => typeof child === 'object' && 'w:pPr' in child);
       if (!pPrNode) {
@@ -66,14 +66,41 @@ function applyCustomFormat(nodes, formatOptions) {
       let prChildren = pPrNode['w:pPr'];
       if (!Array.isArray(prChildren)) prChildren = pPrNode['w:pPr'] = prChildren ? [prChildren] : [];
       
-      // Remover interlineado viejo
-      for (let i = prChildren.length - 1; i >= 0; i--) {
-        const key = Object.keys(prChildren[i]).find(k => k !== ':@');
-        if (key === 'w:spacing') prChildren.splice(i, 1);
+      // Remover interlineado viejo si enviaron nuevo
+      if (interlineado) {
+        for (let i = prChildren.length - 1; i >= 0; i--) {
+          const key = Object.keys(prChildren[i]).find(k => k !== ':@');
+          if (key === 'w:spacing') prChildren.splice(i, 1);
+        }
+        const lineSpacingTwips = Math.round(parseFloat(interlineado) * 240);
+        prChildren.push({ 'w:spacing': [], ':@': { 'w:line': String(lineSpacingTwips), 'w:lineRule': 'auto' } });
       }
-      // Agregar nuevo: spacing en twips. (1 linea aprox = 240)
-      const lineSpacingTwips = Math.round(parseFloat(interlineado) * 240);
-      prChildren.push({ 'w:spacing': [], ':@': { 'w:line': String(lineSpacingTwips), 'w:lineRule': 'auto' } });
+
+      // Forzar fuente y tamaño en el párrafo (w:rPr dentro de w:pPr)
+      if (fuente || tamaño) {
+        let pRPrNode = prChildren.find(child => typeof child === 'object' && 'w:rPr' in child);
+        if (!pRPrNode) {
+          pRPrNode = { 'w:rPr': [] };
+          prChildren.push(pRPrNode);
+        }
+        let pRPrChildren = pRPrNode['w:rPr'];
+        if (!Array.isArray(pRPrChildren)) pRPrChildren = pRPrNode['w:rPr'] = pRPrChildren ? [pRPrChildren] : [];
+
+        for (let i = pRPrChildren.length - 1; i >= 0; i--) {
+          const key = Object.keys(pRPrChildren[i]).find(k => k !== ':@');
+          if (key === 'w:rFonts' && fuente) pRPrChildren.splice(i, 1);
+          if ((key === 'w:sz' || key === 'w:szCs') && tamaño) pRPrChildren.splice(i, 1);
+        }
+
+        if (fuente) {
+          pRPrChildren.push({ 'w:rFonts': [], ':@': { 'w:ascii': fuente, 'w:hAnsi': fuente, 'w:cs': fuente } });
+        }
+        if (tamaño) {
+          const halfPt = String(Math.round(parseFloat(tamaño) * 2));
+          pRPrChildren.push({ 'w:sz': [], ':@': { 'w:val': halfPt } });
+          pRPrChildren.push({ 'w:szCs': [], ':@': { 'w:val': halfPt } });
+        }
+      }
     }
 
     // Modificar fuente y tamaño en w:r

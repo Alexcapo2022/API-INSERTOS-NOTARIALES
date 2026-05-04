@@ -3,3 +3,4 @@ src/assets/uploads
 src/assets/out
 logs
 .env
+tests/minutas

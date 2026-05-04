@@ -18,6 +18,8 @@
     "helmet": "^8.1.0",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "mysql2": "^3.22.3",
+    "openai": "^6.36.0",
     "pizzip": "^3.2.0"
   },
   "devDependencies": {

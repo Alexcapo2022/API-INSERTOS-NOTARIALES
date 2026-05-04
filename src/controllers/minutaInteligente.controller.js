@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const aiService = require('../services/ai.service');
 const minutaService = require('../services/minutaInteligente.service');
+const { validateFormatOptions } = require('../utils/formatEnums');
 
 async function procesarMinutaInteligente(req, res) {
   try {
@@ -13,6 +14,12 @@ async function procesarMinutaInteligente(req, res) {
 
     if (!co_cnl) {
       return res.status(400).json({ ok: false, msg: 'Falta el parámetro co_cnl' });
+    }
+
+    // Validar parámetros de formato
+    const formatErrors = validateFormatOptions({ fuente, tamaño, interlineado, margenes });
+    if (formatErrors.length > 0) {
+      return res.status(400).json({ ok: false, msg: 'Parámetros de formato inválidos', errors: formatErrors });
     }
 
     // 1. Obtener reglas de DB según el co_cnl (Ej: '0101')

@@ -200,6 +200,47 @@ function processMinutaInteligente(buffer, aiLimits, formatOptions) {
 
   // Slice de los hijos validos, excluyendo sectPr que siempre debe ir al final
   let validNodes = children.slice(startIdx, endIdx + 1).filter(n => !n['w:sectPr']);
+
+  // Filtrar textos intermedios a eliminar (firmas, etc.)
+  if (aiLimits.textos_a_eliminar && Array.isArray(aiLimits.textos_a_eliminar) && aiLimits.textos_a_eliminar.length > 0) {
+    const textosEliminarNormalized = aiLimits.textos_a_eliminar.map(t => normalizeText(t));
+    
+    let validFullTextStr = '';
+    const validCharToNodeIdx = [];
+    
+    validNodes.forEach((child, idx) => {
+      const pText = getParagraphText(child);
+      if (pText) {
+        const normalizedPText = normalizeText(pText);
+        if (normalizedPText) {
+          const textToAppend = normalizedPText + ' ';
+          for (let i = 0; i < textToAppend.length; i++) {
+            validCharToNodeIdx.push(idx);
+          }
+          validFullTextStr += textToAppend;
+        }
+      }
+    });
+
+    const indicesAEliminar = new Set();
+
+    textosEliminarNormalized.forEach(searchDel => {
+      let matchPos = validFullTextStr.indexOf(searchDel);
+      while (matchPos !== -1) {
+        const matchEndChar = matchPos + searchDel.length - 1;
+        const startNodeIdx = validCharToNodeIdx[matchPos];
+        const endNodeIdx = validCharToNodeIdx[matchEndChar];
+        
+        for (let i = startNodeIdx; i <= endNodeIdx; i++) {
+          indicesAEliminar.add(i);
+        }
+        matchPos = validFullTextStr.indexOf(searchDel, matchPos + 1);
+      }
+    });
+
+    validNodes = validNodes.filter((_, idx) => !indicesAEliminar.has(idx));
+  }
+
   let sectPrNode = children.find(n => n['w:sectPr']);
 
   // Aplicar Formato a los Nodos válidos

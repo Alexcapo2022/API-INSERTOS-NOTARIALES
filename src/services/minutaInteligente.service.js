@@ -131,6 +131,24 @@ function applyCustomFormat(nodes, formatOptions) {
       }
     }
 
+    // Convertir texto a mayúsculas en w:t
+    if ('w:t' in n) {
+      const tVal = n['w:t'];
+      if (Array.isArray(tVal)) {
+        for (let i = 0; i < tVal.length; i++) {
+          if (typeof tVal[i] === 'string') {
+            tVal[i] = tVal[i].toUpperCase();
+          } else if (tVal[i] && typeof tVal[i] === 'object' && '#text' in tVal[i]) {
+            tVal[i]['#text'] = String(tVal[i]['#text']).toUpperCase();
+          }
+        }
+      } else if (typeof tVal === 'string') {
+        n['w:t'] = tVal.toUpperCase();
+      } else if (tVal && typeof tVal === 'object' && '#text' in tVal) {
+        tVal['#text'] = String(tVal['#text']).toUpperCase();
+      }
+    }
+
     for (const k of Object.keys(n)) {
       if (k === ':@') continue;
       const v = n[k];

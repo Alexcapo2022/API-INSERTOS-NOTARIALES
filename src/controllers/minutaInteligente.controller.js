@@ -9,6 +9,14 @@ async function procesarMinutaInteligente(req, res) {
       return res.status(400).json({ ok: false, msg: 'Falta el archivo de minuta (DOCX)' });
     }
 
+    // Validar extensión del archivo (solo .docx)
+    if (!req.file.originalname.toLowerCase().endsWith('.docx')) {
+      return res.status(400).json({ 
+        ok: false, 
+        msg: 'Formato de archivo inválido. El sistema solo soporta documentos en formato .docx. Si tienes un .doc antiguo, ábrelo en Word y guárdalo como .docx antes de procesarlo.' 
+      });
+    }
+
     const fileBuffer = req.file.buffer;
     const { co_cnl, fuente, interlineado, margenes } = req.body;
     const tamaño = req.body.tamaño || req.body.tamano; // Soportar ambo nombres

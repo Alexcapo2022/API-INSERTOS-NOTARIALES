@@ -249,8 +249,21 @@ function processMinutaInteligente(buffer, aiLimits, formatOptions) {
         const startNodeIdx = validCharToNodeIdx[matchPos];
         const endNodeIdx = validCharToNodeIdx[matchEndChar];
         
-        for (let i = startNodeIdx; i <= endNodeIdx; i++) {
-          indicesAEliminar.add(i);
+        if (startNodeIdx !== endNodeIdx) {
+          // Si el bloque a eliminar abarca múltiples párrafos, es seguro borrarlos todos
+          for (let i = startNodeIdx; i <= endNodeIdx; i++) {
+            indicesAEliminar.add(i);
+          }
+        } else {
+          // Si está en un solo párrafo, asegurarnos de no borrar un párrafo legal gigante entero
+          // por culpa de que contiene una simple firma o fecha.
+          const pText = normalizeText(getParagraphText(validNodes[startNodeIdx]));
+          // Si el texto a eliminar representa al menos el 40% del párrafo, o el párrafo es pequeño (menor a 80 chars)
+          if (searchDel.length >= pText.length * 0.4 || pText.length < 80) {
+            indicesAEliminar.add(startNodeIdx);
+          } else {
+            console.warn(`[MinutaInteligente] Se evitó borrar párrafo gigante por coincidencia menor: "${searchDel}" en "${pText.substring(0, 30)}..."`);
+          }
         }
         matchPos = validFullTextStr.indexOf(searchDel, matchPos + 1);
       }

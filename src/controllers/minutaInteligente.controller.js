@@ -18,7 +18,7 @@ async function procesarMinutaInteligente(req, res) {
     }
 
     const fileBuffer = req.file.buffer;
-    const { co_cnl, fuente, interlineado, margenes } = req.body;
+    const { co_cnl, fuente, interlineado, margenes, usar_prompt } = req.body;
     const tamaño = req.body.tamaño || req.body.tamano; // Soportar ambo nombres
 
     if (!co_cnl) {
@@ -31,44 +31,67 @@ async function procesarMinutaInteligente(req, res) {
       return res.status(400).json({ ok: false, msg: 'Parámetros de formato inválidos', errors: formatErrors });
     }
 
-    // 1. Obtener reglas de DB según el co_cnl (Ej: '0101')
-    const [rows] = await db.execute(`
-      SELECT p.de_prompt 
-      FROM p_servicio_cnl s
-      JOIN r_servicio_cnl_minuta_prompt r ON s.co_servicio_cnl = r.co_servicio_cnl
-      JOIN p_prompt_minuta p ON r.co_prompt = p.co_prompt
-      WHERE s.co_cnl = ? 
-        AND p.in_estado = 1 
-        AND r.in_estado = 1
-      ORDER BY p.fe_creacion DESC LIMIT 1
-    `, [co_cnl]);
-
-    if (!rows || rows.length === 0) {
-      console.error(`[Controller] No se encontraron reglas (prompt) para co_cnl=${co_cnl}`);
-      return res.status(404).json({ 
-        ok: false, 
-        msg: `El código de servicio co_cnl '${co_cnl}' no tiene un prompt configurado o activo en la base de datos.` 
-      });
-    }
-    
-    const reglasPrompt = rows[0].de_prompt;
-
-    // 2. Extraer texto para la IA
-    const textoDoc = minutaService.extractTextForAI(fileBuffer);
-    if (!textoDoc) {
-      return res.status(400).json({ ok: false, msg: 'El documento está vacío o no se pudo extraer el texto.' });
-    }
-
-    // 3. IA: Detectar límites
-    const aiLimits = await aiService.detectarLimitesMinuta(textoDoc, reglasPrompt);
-    console.log('[Minuta Inteligente] Límites detectados por IA:', aiLimits);
-
-    if (!aiLimits.texto_inicio || !aiLimits.texto_fin) {
-      return res.status(500).json({ ok: false, msg: 'La IA no pudo detectar el inicio y fin correctamente.' });
-    }
-
-    // 4. Modificar DOCX: cortar sobrantes y aplicar formato
     const formatOptions = { fuente, tamaño, interlineado, margenes };
+    let aiLimits = null;
+
+    if (String(usar_prompt) === '1' || String(usar_prompt) === 'true') {
+      // 1. Obtener reglas de DB según el co_cnl
+      let [rows] = await db.execute(`
+        SELECT p.de_prompt 
+        FROM p_servicio_cnl s
+        JOIN r_servicio_cnl_minuta_prompt r ON s.co_servicio_cnl = r.co_servicio_cnl
+        JOIN p_prompt_minuta p ON r.co_prompt = p.co_prompt
+        WHERE s.co_cnl = ? 
+          AND p.in_estado = 1 
+          AND r.in_estado = 1
+        ORDER BY p.fe_creacion DESC LIMIT 1
+      `, [co_cnl]);
+
+      // Fallback Automático si no hay reglas
+      if (!rows || rows.length === 0) {
+        console.warn(`[Controller] No hay prompt para co_cnl=${co_cnl}. Ejecutando Fallback al Prompt 1.`);
+        const [servRows] = await db.execute('SELECT co_servicio_cnl FROM p_servicio_cnl WHERE co_cnl = ? LIMIT 1', [co_cnl]);
+        
+        if (servRows && servRows.length > 0) {
+          const co_servicio_cnl = servRows[0].co_servicio_cnl;
+          // Crear la relación con el prompt maestro (1)
+          await db.execute(
+            'INSERT INTO r_servicio_cnl_minuta_prompt (co_servicio_cnl, co_prompt, in_estado, fe_creacion) VALUES (?, 1, 1, NOW())',
+            [co_servicio_cnl]
+          );
+          // Volver a consultar
+          const [fallbackRows] = await db.execute('SELECT de_prompt FROM p_prompt_minuta WHERE co_prompt = 1 LIMIT 1');
+          if (fallbackRows && fallbackRows.length > 0) {
+            rows = fallbackRows;
+          }
+        }
+      }
+
+      if (rows && rows.length > 0) {
+        const reglasPrompt = rows[0].de_prompt;
+
+        // 2. Extraer texto para la IA
+        const textoDoc = minutaService.extractTextForAI(fileBuffer);
+        if (!textoDoc) {
+          return res.status(400).json({ ok: false, msg: 'El documento está vacío o no se pudo extraer el texto.' });
+        }
+
+        // 3. IA: Detectar límites
+        aiLimits = await aiService.detectarLimitesMinuta(textoDoc, reglasPrompt);
+        console.log('[Minuta Inteligente] Límites detectados por IA:', aiLimits);
+
+        if (!aiLimits.texto_inicio || !aiLimits.texto_fin) {
+          return res.status(500).json({ ok: false, msg: 'La IA no pudo detectar el inicio y fin correctamente.' });
+        }
+      } else {
+         console.error(`[Controller] Falló incluso el fallback para co_cnl=${co_cnl}`);
+         return res.status(500).json({ ok: false, msg: 'No se pudo aplicar la limpieza por IA, reglas maestras no encontradas.' });
+      }
+    } else {
+      console.log(`[Controller] usar_prompt es 0 (o false) para co_cnl=${co_cnl}. Saltando limpieza de IA, solo se aplicará formato.`);
+    }
+
+    // 4. Modificar DOCX: cortar sobrantes (si hay aiLimits) y aplicar formato
     const nuevoDocxBuffer = minutaService.processMinutaInteligente(fileBuffer, aiLimits, formatOptions);
 
     // 5. Retornar archivo

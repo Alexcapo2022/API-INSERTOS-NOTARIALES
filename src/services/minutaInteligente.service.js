@@ -31,7 +31,7 @@ function extractTextForAI(buffer) {
   const docXml = zip.file('word/document.xml')?.asText();
   if (!docXml) return '';
 
-  const parserPO = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', preserveOrder: true, trimValues: false });
+  const parserPO = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', preserveOrder: true, trimValues: false, parseTagValue: false });
   const docObj = parserPO.parse(docXml);
   const docNode = docObj.find(n => n['w:document']);
   if (!docNode) return '';
@@ -172,7 +172,7 @@ function processMinutaInteligente(buffer, aiLimits, formatOptions) {
   const docXml = zip.file(docXmlPath)?.asText();
   if (!docXml) throw new Error("No document.xml found");
 
-  const parserPO = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', preserveOrder: true, trimValues: false });
+  const parserPO = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', preserveOrder: true, trimValues: false, parseTagValue: false });
   const docObj = parserPO.parse(docXml);
 
   const docNode = docObj.find(n => n['w:document']);
@@ -182,94 +182,99 @@ function processMinutaInteligente(buffer, aiLimits, formatOptions) {
   // Encuentra indices
   let startIdx = 0;
   let endIdx = children.length - 1;
-  const searchStart = normalizeText(aiLimits.texto_inicio);
-  const searchEnd = normalizeText(aiLimits.texto_fin);
+  let validNodes = [];
+  
+  if (aiLimits) {
+    const searchStart = normalizeText(aiLimits.texto_inicio);
+    const searchEnd = normalizeText(aiLimits.texto_fin);
 
-  // Mapeamos cada caracter del texto normalizado a su nodo original
-  const charToNodeIdx = [];
-  let fullTextStr = '';
+    // Mapeamos cada caracter del texto normalizado a su nodo original
+    const charToNodeIdx = [];
+    let fullTextStr = '';
 
-  children.forEach((child, idx) => {
-    const pText = getParagraphText(child);
-    if (pText) {
-      const normalizedPText = normalizeText(pText);
-      if (normalizedPText) {
-        const textToAppend = normalizedPText + ' '; // 1 espacio entre párrafos
-        for (let i = 0; i < textToAppend.length; i++) {
-          charToNodeIdx.push(idx);
-        }
-        fullTextStr += textToAppend;
-      }
-    }
-  });
-
-  // Búsqueda del índice de inicio
-  const startMatchPos = fullTextStr.indexOf(searchStart);
-  if (startMatchPos !== -1) {
-    startIdx = charToNodeIdx[startMatchPos];
-  }
-
-  // Búsqueda del índice de fin
-  const endMatchPos = fullTextStr.lastIndexOf(searchEnd); // lastIndexOf por si hay textos repetidos, buscar el último
-  if (endMatchPos !== -1) {
-    const matchEndChar = endMatchPos + searchEnd.length - 1;
-    endIdx = charToNodeIdx[matchEndChar];
-  }
-
-  // Slice de los hijos validos, excluyendo sectPr que siempre debe ir al final
-  let validNodes = children.slice(startIdx, endIdx + 1).filter(n => !n['w:sectPr']);
-
-  // Filtrar textos intermedios a eliminar (firmas, etc.)
-  if (aiLimits.textos_a_eliminar && Array.isArray(aiLimits.textos_a_eliminar) && aiLimits.textos_a_eliminar.length > 0) {
-    const textosEliminarNormalized = aiLimits.textos_a_eliminar.map(t => normalizeText(t));
-    
-    let validFullTextStr = '';
-    const validCharToNodeIdx = [];
-    
-    validNodes.forEach((child, idx) => {
+    children.forEach((child, idx) => {
       const pText = getParagraphText(child);
       if (pText) {
         const normalizedPText = normalizeText(pText);
         if (normalizedPText) {
-          const textToAppend = normalizedPText + ' ';
+          const textToAppend = normalizedPText + ' '; // 1 espacio entre párrafos
           for (let i = 0; i < textToAppend.length; i++) {
-            validCharToNodeIdx.push(idx);
+            charToNodeIdx.push(idx);
           }
-          validFullTextStr += textToAppend;
+          fullTextStr += textToAppend;
         }
       }
     });
 
-    const indicesAEliminar = new Set();
+    // Búsqueda del índice de inicio
+    const startMatchPos = fullTextStr.indexOf(searchStart);
+    if (startMatchPos !== -1) {
+      startIdx = charToNodeIdx[startMatchPos];
+    }
 
-    textosEliminarNormalized.forEach(searchDel => {
-      let matchPos = validFullTextStr.indexOf(searchDel);
-      while (matchPos !== -1) {
-        const matchEndChar = matchPos + searchDel.length - 1;
-        const startNodeIdx = validCharToNodeIdx[matchPos];
-        const endNodeIdx = validCharToNodeIdx[matchEndChar];
-        
-        if (startNodeIdx !== endNodeIdx) {
-          // Si el bloque a eliminar abarca múltiples párrafos, es seguro borrarlos todos
-          for (let i = startNodeIdx; i <= endNodeIdx; i++) {
-            indicesAEliminar.add(i);
+    // Búsqueda del índice de fin
+    const endMatchPos = fullTextStr.lastIndexOf(searchEnd); // lastIndexOf por si hay textos repetidos, buscar el último
+    if (endMatchPos !== -1) {
+      const matchEndChar = endMatchPos + searchEnd.length - 1;
+      endIdx = charToNodeIdx[matchEndChar];
+    }
+
+    // Slice de los hijos validos, excluyendo sectPr que siempre debe ir al final
+    validNodes = children.slice(startIdx, endIdx + 1).filter(n => !n['w:sectPr']);
+
+    // Filtrar textos intermedios a eliminar (firmas, etc.)
+    if (aiLimits.textos_a_eliminar && Array.isArray(aiLimits.textos_a_eliminar) && aiLimits.textos_a_eliminar.length > 0) {
+      const textosEliminarNormalized = aiLimits.textos_a_eliminar.map(t => normalizeText(t));
+      
+      let validFullTextStr = '';
+      const validCharToNodeIdx = [];
+      
+      validNodes.forEach((child, idx) => {
+        const pText = getParagraphText(child);
+        if (pText) {
+          const normalizedPText = normalizeText(pText);
+          if (normalizedPText) {
+            const textToAppend = normalizedPText + ' ';
+            for (let i = 0; i < textToAppend.length; i++) {
+              validCharToNodeIdx.push(idx);
+            }
+            validFullTextStr += textToAppend;
           }
-        } else {
-          // Si está en un solo párrafo, asegurarnos de no borrar un párrafo legal gigante entero
-          // por culpa de que contiene una simple firma o fecha.
-          const pText = normalizeText(getParagraphText(validNodes[startNodeIdx]));
-          // Si el texto a eliminar representa al menos el 40% del párrafo, o el párrafo es pequeño (menor a 80 chars)
-          if (searchDel.length >= pText.length * 0.4 || pText.length < 80) {
-            indicesAEliminar.add(startNodeIdx);
+        }
+      });
+
+      const indicesAEliminar = new Set();
+
+      textosEliminarNormalized.forEach(searchDel => {
+        let matchPos = validFullTextStr.indexOf(searchDel);
+        while (matchPos !== -1) {
+          const matchEndChar = matchPos + searchDel.length - 1;
+          const startNodeIdx = validCharToNodeIdx[matchPos];
+          const endNodeIdx = validCharToNodeIdx[matchEndChar];
+          
+          if (startNodeIdx !== endNodeIdx) {
+            // Si el bloque a eliminar abarca múltiples párrafos, es seguro borrarlos todos
+            for (let i = startNodeIdx; i <= endNodeIdx; i++) {
+              indicesAEliminar.add(i);
+            }
           } else {
-            console.warn(`[MinutaInteligente] Se evitó borrar párrafo gigante por coincidencia menor: "${searchDel}" en "${pText.substring(0, 30)}..."`);
+            // Si está en un solo párrafo, asegurarnos de no borrar un párrafo legal gigante entero
+            const pText = normalizeText(getParagraphText(validNodes[startNodeIdx]));
+            if (searchDel.length >= pText.length * 0.4 || pText.length < 80) {
+              indicesAEliminar.add(startNodeIdx);
+            } else {
+              console.warn(`[MinutaInteligente] Se evitó borrar párrafo gigante por coincidencia menor: "${searchDel}" en "${pText.substring(0, 30)}..."`);
+            }
           }
+          matchPos = validFullTextStr.indexOf(searchDel, matchPos + 1);
         }
-        matchPos = validFullTextStr.indexOf(searchDel, matchPos + 1);
-      }
-    });
+      });
 
-    validNodes = validNodes.filter((_, idx) => !indicesAEliminar.has(idx));
+      validNodes = validNodes.filter((_, idx) => !indicesAEliminar.has(idx));
+    }
+  } else {
+    // Si no hay límites de IA, el documento es 100% válido, no borramos nada
+    validNodes = children.filter(n => !n['w:sectPr']);
   }
 
   let sectPrNode = children.find(n => n['w:sectPr']);

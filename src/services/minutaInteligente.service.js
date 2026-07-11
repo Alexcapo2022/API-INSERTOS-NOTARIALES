@@ -52,6 +52,22 @@ function extractTextForAI(buffer) {
 function applyCustomFormat(nodes, formatOptions) {
   const { fuente, tamaño, interlineado } = formatOptions;
 
+  const rPrOrder = ['w:rStyle', 'w:rFonts', 'w:b', 'w:bCs', 'w:i', 'w:iCs', 'w:caps', 'w:smallCaps', 'w:strike', 'w:dstrike', 'w:outline', 'w:shadow', 'w:emboss', 'w:imprint', 'w:noProof', 'w:snapToGrid', 'w:color', 'w:spacing', 'w:w', 'w:kern', 'w:position', 'w:sz', 'w:szCs', 'w:highlight', 'w:u', 'w:effect', 'w:bdr', 'w:shd', 'w:fitText', 'w:vertAlign', 'w:rtl', 'w:cs', 'w:em', 'w:lang', 'w:eastAsianLayout', 'w:specVanish', 'w:oMath'];
+  const pPrOrder = ['w:pStyle', 'w:keepNext', 'w:keepLines', 'w:pageBreakBefore', 'w:framePr', 'w:widowControl', 'w:numPr', 'w:suppressLineNumbers', 'w:pBdr', 'w:shd', 'w:tabs', 'w:suppressAutoHyphens', 'w:kinsoku', 'w:wordWrap', 'w:overflowPunct', 'w:topLinePunct', 'w:autoSpaceDE', 'w:autoSpaceDN', 'w:bidi', 'w:adjustRightInd', 'w:snapToGrid', 'w:spacing', 'w:ind', 'w:contextualSpacing', 'w:mirrorIndents', 'w:suppressOverlap', 'w:jc', 'w:textDirection', 'w:textAlignment', 'w:textboxTightWrap', 'w:outlineLvl', 'w:divId', 'w:cnfStyle', 'w:rPr', 'w:sectPr', 'w:pPrChange'];
+
+  function sortPr(prArray, orderList) {
+    if (!Array.isArray(prArray)) return;
+    prArray.sort((a, b) => {
+      const keyA = Object.keys(a).find(k => k !== ':@');
+      const keyB = Object.keys(b).find(k => k !== ':@');
+      let idxA = orderList.indexOf(keyA);
+      let idxB = orderList.indexOf(keyB);
+      if (idxA === -1) idxA = 999;
+      if (idxB === -1) idxB = 999;
+      return idxA - idxB;
+    });
+  }
+
   function walk(n) {
     if (!n || typeof n !== 'object') return;
 
@@ -100,7 +116,11 @@ function applyCustomFormat(nodes, formatOptions) {
           pRPrChildren.push({ 'w:sz': [], ':@': { 'w:val': halfPt } });
           pRPrChildren.push({ 'w:szCs': [], ':@': { 'w:val': halfPt } });
         }
+        
+        sortPr(pRPrChildren, rPrOrder);
       }
+      
+      sortPr(prChildren, pPrOrder);
     }
 
     // Modificar fuente y tamaño en w:r
@@ -129,6 +149,8 @@ function applyCustomFormat(nodes, formatOptions) {
         prChildren.push({ 'w:sz': [], ':@': { 'w:val': halfPt } });
         prChildren.push({ 'w:szCs': [], ':@': { 'w:val': halfPt } });
       }
+      
+      sortPr(prChildren, rPrOrder);
     }
 
     // Convertir texto a mayúsculas en w:t

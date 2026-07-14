@@ -54,16 +54,23 @@ async function procesarMinutaInteligente(req, res) {
         
         if (servRows && servRows.length > 0) {
           const co_servicio_cnl = servRows[0].co_servicio_cnl;
-          // Crear la relación con el prompt maestro (1)
-          await db.execute(
-            'INSERT INTO r_servicio_cnl_minuta_prompt (co_servicio_cnl, co_prompt, in_estado, fe_creacion) VALUES (?, 1, 1, NOW())',
-            [co_servicio_cnl]
-          );
+          // Crear la relación con el prompt maestro (1) con manejo de errores
+          try {
+            await db.execute(
+              'INSERT INTO r_servicio_cnl_minuta_prompt (co_servicio_cnl, co_prompt, in_estado, fe_creacion) VALUES (?, 1, 1, NOW())',
+              [co_servicio_cnl]
+            );
+            console.log(`[Controller] Configuración fallback creada para co_servicio_cnl=${co_servicio_cnl}`);
+          } catch (insertError) {
+            console.warn(`[Controller] No se pudo insertar fallback (quizás ya existía):`, insertError.message);
+          }
           // Volver a consultar
           const [fallbackRows] = await db.execute('SELECT de_prompt FROM p_prompt_minuta WHERE co_prompt = 1 LIMIT 1');
           if (fallbackRows && fallbackRows.length > 0) {
             rows = fallbackRows;
           }
+        } else {
+          console.error(`[Controller] Fallback falló: No existe co_servicio_cnl para co_cnl=${co_cnl} en p_servicio_cnl`);
         }
       }
 
